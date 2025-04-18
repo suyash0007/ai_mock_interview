@@ -95,31 +95,57 @@ export async function getLatestInterviews(
 ): Promise<Interview[] | null> {
   const { userId, limit = 20 } = params;
 
-  const interviews = await db
-    .collection("interviews")
-    .orderBy("createdAt", "desc")
-    .where("finalized", "==", true)
-    .where("userId", "!=", userId)
-    .limit(limit)
-    .get();
+  try {
+    // Simplified query that doesn't require a complex index
+    const interviews = await db
+      .collection("interviews")
+      .where("finalized", "==", true)
+      .get();
 
-  return interviews.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Interview[];
+    // Manual filtering and sorting
+    const filteredInterviews = interviews.docs
+      .filter(doc => doc.data().userId !== userId)
+      .sort((a, b) => {
+        const dateA = new Date(a.data().createdAt).getTime();
+        const dateB = new Date(b.data().createdAt).getTime();
+        return dateB - dateA; // Sort in descending order
+      })
+      .slice(0, limit);
+
+    return filteredInterviews.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Interview[];
+  } catch (error) {
+    console.error("Error fetching latest interviews:", error);
+    return null;
+  }
 }
 
 export async function getInterviewsByUserId(
   userId: string
 ): Promise<Interview[] | null> {
-  const interviews = await db
-    .collection("interviews")
-    .where("userId", "==", userId)
-    .orderBy("createdAt", "desc")
-    .get();
+  try {
+    // Simplified query that doesn't require a complex index
+    const interviews = await db
+      .collection("interviews")
+      .where("userId", "==", userId)
+      .get();
 
-  return interviews.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Interview[];
+    // Manual sorting
+    const sortedInterviews = interviews.docs
+      .sort((a, b) => {
+        const dateA = new Date(a.data().createdAt).getTime();
+        const dateB = new Date(b.data().createdAt).getTime();
+        return dateB - dateA; // Sort in descending order
+      });
+
+    return sortedInterviews.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Interview[];
+  } catch (error) {
+    console.error("Error fetching user interviews:", error);
+    return null;
+  }
 }
